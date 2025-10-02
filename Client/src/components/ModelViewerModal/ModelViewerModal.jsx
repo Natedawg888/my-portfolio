@@ -43,7 +43,11 @@ export default function ModelViewerModal({ src, title, onClose }) {
     grid.material.opacity = 0.25;
     scene.add(grid);
 
-    const url = src.startsWith("/") ? src : `/${src}`;
+    const url = /^(https?:|blob:|data:)/i.test(src)
+      ? src
+      : src?.startsWith("/")
+      ? src
+      : `/${src}`;
     let root; // model root
 
     const fitAndCenter = (object) => {
