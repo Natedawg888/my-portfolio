@@ -47,6 +47,3 @@ jobs:
           output_location: dist
           skip_app_build: true
           github_id_token: ${{ steps.idtoken.outputs.result }}
-
-
-
