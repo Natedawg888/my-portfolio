@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { getProjects } from "../../lib/api";
 import styles from "./Projects.module.css";
 
@@ -39,26 +39,6 @@ function toPublicPath(p) {
   return p.startsWith("/") ? p : `/${p}`;
 }
 
-/** Throttle helper: runs tasks in parallel up to `limit` */
-async function throttleAll(tasks, limit = 5) {
-  const ret = [];
-  let i = 0;
-  const workers = new Array(Math.min(limit, tasks.length))
-    .fill(null)
-    .map(async () => {
-      while (i < tasks.length) {
-        const idx = i++;
-        try {
-          ret[idx] = await tasks[idx]();
-        } catch (e) {
-          ret[idx] = e;
-        }
-      }
-    });
-  await Promise.all(workers);
-  return ret;
-}
-
 export default function Projects() {
   // filters/data
   const [active, setActive] = useState("all");
@@ -66,15 +46,10 @@ export default function Projects() {
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  // modals
+  // 🔽 modal state (the missing bits)
   const [modelPreview, setModelPreview] = useState(null); // { src, title }
   const [imagePreview, setImagePreview] = useState(null); // { src, title }
   const [gamePreview, setGamePreview] = useState(null); // { title, videos, shots }
-
-  // model cache (url -> blobUrl)
-  const [modelCache, setModelCache] = useState(() => new Map());
-  // Keep track of blob URLs to revoke on cleanup
-  const blobUrlsRef = useRef(new Set());
 
   // transform filter → API arg
   const endpointArg = useMemo(
@@ -82,7 +57,7 @@ export default function Projects() {
     [active]
   );
 
-  // fetch projects
+  // fetch
   useEffect(() => {
     let cancel = false;
     setLoading(true);
@@ -128,64 +103,6 @@ export default function Projects() {
     };
   }, [endpointArg]);
 
-  /* ---------- preload models once items are available ---------- */
-  useEffect(() => {
-    if (!items?.length) return;
-
-    const controllers = [];
-    const toPreload = items
-      .map((p) => p.fbx_path)
-      .filter(Boolean)
-      .filter((url) => !modelCache.has(url)); // skip already cached
-
-    if (toPreload.length === 0) return;
-
-    const tasks = toPreload.map((url) => async () => {
-      const ctrl = new AbortController();
-      controllers.push(ctrl);
-
-      try {
-        const res = await fetch(url, {
-          signal: ctrl.signal,
-          credentials: "omit",
-        });
-        if (!res.ok) throw new Error(`Failed to preload ${url}: ${res.status}`);
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-
-        blobUrlsRef.current.add(blobUrl);
-        // store in cache
-        setModelCache((prev) => {
-          const next = new Map(prev);
-          next.set(url, blobUrl);
-          return next;
-        });
-      } catch (e) {
-        // swallow: we’ll just fall back to the original URL on click
-        // console.warn(e);
-      }
-    });
-
-    // throttle to avoid network bursts
-    throttleAll(tasks, 3);
-
-    return () => {
-      // cancel any in-flight preloads on filter change/unmount
-      controllers.forEach((c) => c.abort());
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [items]);
-
-  // Revoke blob URLs when the page unmounts (or on hard reload)
-  useEffect(() => {
-    return () => {
-      for (const u of blobUrlsRef.current) {
-        URL.revokeObjectURL(u);
-      }
-      blobUrlsRef.current.clear();
-    };
-  }, []);
-
   return (
     <section className={styles.section}>
       <div className={styles.header}>
@@ -224,8 +141,7 @@ export default function Projects() {
                   className={styles.thumb}
                   onClick={() => {
                     if (cat === "models" && p.fbx_path) {
-                      const src = modelCache.get(p.fbx_path) || p.fbx_path;
-                      setModelPreview({ src, title: p.title });
+                      setModelPreview({ src: p.fbx_path, title: p.title });
                     } else if (
                       (cat === "assets" || cat === "logos") &&
                       (p.project_url || p.thumbnail)
@@ -271,10 +187,9 @@ export default function Projects() {
                     <button
                       type="button"
                       className={styles.filterBtn}
-                      onClick={() => {
-                        const src = modelCache.get(p.fbx_path) || p.fbx_path;
-                        setModelPreview({ src, title: p.title });
-                      }}
+                      onClick={() =>
+                        setModelPreview({ src: p.fbx_path, title: p.title })
+                      }
                     >
                       Preview 3D
                     </button>
