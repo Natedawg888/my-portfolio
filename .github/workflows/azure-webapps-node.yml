@@ -1,0 +1,28 @@
+name: Deploy API to Azure App Service
+on:
+  push:
+    branches: [ main ]
+    paths:
+      - 'Server/**'
+      - '.github/workflows/api-deploy.yml'
+  workflow_dispatch:
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: '20' }
+      - name: Install
+        working-directory: Server
+        run: npm ci
+      - name: Zip Server
+        run: cd Server && zip -r ../server.zip .
+      - name: Deploy
+        uses: azure/webapps-deploy@v3
+        with:
+          app-name: portfolio-api-nz     # <-- your App Service name
+          publish-profile: ${{ secrets.AZURE_WEBAPP_PUBLISH_PROFILE }}
+          package: server.zip
+
