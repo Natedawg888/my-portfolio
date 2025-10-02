@@ -1,4 +1,3 @@
-// Server/routes/projects.js
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
@@ -12,18 +11,11 @@ router.get("/", async (req, res) => {
 
     let sql = `
       SELECT
-        id,
-        title,
-        category,
-        description,
-        thumbnail,
-        fbx_path,
-        project_url,
-        CAST(tags         AS CHAR) AS tags,
-        CAST(video_url    AS CHAR) AS video_url,
-        CAST(screenshots  AS CHAR) AS screenshots,
-        featured,
-        created_at
+        id, title, category, description, thumbnail, fbx_path, project_url,
+        CAST(tags AS CHAR)        AS tags,
+        CAST(video_url AS CHAR)   AS video_url,
+        CAST(screenshots AS CHAR) AS screenshots,
+        featured, created_at
       FROM projects
     `;
 
@@ -40,7 +32,6 @@ router.get("/", async (req, res) => {
   } catch (e) {
     console.error("GET /api/projects error:", e);
     res.status(500).json({
-      ok: false,
       error: "Failed to load projects",
       code: e.code,
       message: e.sqlMessage || e.message,
