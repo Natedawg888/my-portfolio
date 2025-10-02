@@ -1,31 +1,41 @@
-// Server/server.js
 require("dotenv").config();
 const express = require("express");
 const cors = require("cors");
-const pool = require("./db");
 
 const app = express();
-
 const PORT = process.env.PORT || 4000;
-const CORS_ORIGIN = process.env.CORS_ORIGIN || "*";
 
-app.use(cors({ origin: CORS_ORIGIN, credentials: true }));
+// Parse CORS_ORIGIN as a single value or comma-separated list
+function parseOrigins(s) {
+  if (!s) return [];
+  const list = String(s)
+    .split(",")
+    .map((v) => v.trim())
+    .filter(Boolean);
+  return list.length <= 1 ? list[0] || false : list;
+}
+const ALLOWED_ORIGINS = parseOrigins(process.env.CORS_ORIGIN);
+
+// CORS
+app.use(
+  cors({
+    origin: ALLOWED_ORIGINS || "*",
+    credentials: true,
+  })
+);
+
 app.use(express.json());
 
-// quick health check (app only)
-app.get("/ping", (_req, res) => {
-  res.json({ ok: true, time: new Date().toISOString() });
+// health/home
+app.get("/", (_req, res) => {
+  res
+    .type("text/plain")
+    .send("portfolio-api-nz running. Try GET /ping or /api/projects");
 });
 
-// db health check (queries MySQL)
-app.get("/db-health", async (_req, res) => {
-  try {
-    const [rows] = await pool.query("SELECT 1 AS up");
-    res.json({ ok: true, up: rows?.[0]?.up === 1 });
-  } catch (e) {
-    res.status(500).json({ ok: false, error: e.message });
-  }
-});
+app.get("/ping", (_req, res) =>
+  res.json({ ok: true, time: new Date().toISOString() })
+);
 
 // routes
 app.use("/api/projects", require("./routes/projects"));
