@@ -14,6 +14,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
+      # Vite requires Node 20+
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
@@ -23,15 +24,16 @@ jobs:
         run: npm ci
 
       - name: Build (Client)
-        working-directory: Client
+      working-directory: Client
         run: npm run build
 
+      # Get OIDC ID token for the SWA action
       - name: Get Id Token
         id: idtoken
         uses: actions/github-script@v6
         with:
           script: |
-            const token = await core.getIDToken();   # <- use provided `core`
+            const token = await core.getIDToken();    // use provided `core`
             return token;
           result-encoding: string
 
@@ -40,6 +42,7 @@ jobs:
         with:
           action: upload
           app_location: ./Client
-          output_location: dist
-          skip_app_build: true
+          output_location: dist         # Vite output folder
+          skip_app_build: true          # we already ran the build
           github_id_token: ${{ steps.idtoken.outputs.result }}
+
