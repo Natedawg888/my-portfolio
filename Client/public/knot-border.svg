@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+  <!-- Use currentColor so CSS can drive color -->
+  <g fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round">
+    <!-- interlaced wave motif, designed to tile -->
+    <path d="M0,32 C12,20 20,20 32,32 C44,44 52,44 64,32"></path>
+    <path d="M0,32 C12,44 20,44 32,32 C44,20 52,20 64,32"></path>
+    <!-- perpendicular weave to add detail when rotated by border-image -->
+    <path d="M32,0 C44,12 44,20 32,32 C20,44 20,52 32,64"></path>
+    <path d="M32,0 C20,12 20,20 32,32 C44,44 44,52 32,64"></path>
+  </g>
+</svg>

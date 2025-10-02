@@ -1,0 +1,42 @@
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Build output
+dist/
+build/
+.cache/
+.cache-loader/
+.vite/
+coverage/
+
+# OS/editor junk
+.DS_Store
+Thumbs.db
+*.swp
+.idea/
+.vscode/
+
+# Env & secrets (DO NOT COMMIT)
+.env
+.env.*
+!.env.example     # keep a template in git
+*.env.local
+
+# Logs & runtime
+logs/
+*.log
+*.pid
+*.seed
+*.tgz
+
+# Typescript
+*.tsbuildinfo
+
+# Next/Remix/etc (harmless if unused)
+.next/
+.vercel/
+.netlify/

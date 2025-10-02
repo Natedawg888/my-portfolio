@@ -1,0 +1,16 @@
+/* Matches the look of .section-title in App.css, but smaller & centered */
+.sectionTitle {
+  font-family: Cinzel, serif;
+  color: #f1e3b4;
+  letter-spacing: 0.08em;
+  text-align: center;
+  font-size: clamp(1.1rem, 2.6vw, 1.6rem); /* smaller than global */
+  margin: 0 0 1rem 0;
+}
+
+/* Optional: a wrapper if you ever want tighter width */
+.titleWrap {
+  width: 100%;
+  display: flex;
+  justify-content: center;
+}
