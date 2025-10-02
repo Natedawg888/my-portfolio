@@ -2,7 +2,7 @@ name: Deploy Client to Azure Static Web Apps
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
   deploy:
@@ -12,28 +12,30 @@ jobs:
       contents: read
 
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
 
-      # Vite requires Node 20+
-      - uses: actions/setup-node@v4
+      - name: Setup Node
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
+          cache: npm
+          cache-dependency-path: Client/package-lock.json
 
       - name: Install (Client)
         working-directory: Client
         run: npm ci
 
       - name: Build (Client)
-      working-directory: Client
+        working-directory: Client
         run: npm run build
 
-      # Get OIDC ID token for the SWA action
       - name: Get Id Token
         id: idtoken
         uses: actions/github-script@v6
         with:
           script: |
-            const token = await core.getIDToken();    // use provided `core`
+            const token = await core.getIDToken();
             return token;
           result-encoding: string
 
@@ -42,7 +44,9 @@ jobs:
         with:
           action: upload
           app_location: ./Client
-          output_location: dist         # Vite output folder
-          skip_app_build: true          # we already ran the build
+          output_location: dist
+          skip_app_build: true
           github_id_token: ${{ steps.idtoken.outputs.result }}
+
+
 
