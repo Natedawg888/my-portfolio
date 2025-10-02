@@ -38,15 +38,9 @@ function toPublicPath(p) {
   if (/^https?:\/\//i.test(p)) return p; // leave full URLs as-is
   return p.startsWith("/") ? p : `/${p}`;
 }
-function isLikelyImage(u = "") {
-  return /\.(png|jpe?g|webp|gif|svg|avif)(\?|#|$)/i.test(u);
-}
-function isLikelyGlb(u = "") {
-  return /\.(glb|gltf)(\?|#|$)/i.test(u);
-}
 
 /** Throttle helper: runs tasks in parallel up to `limit` */
-async function throttleAll(tasks, limit = 3) {
+async function throttleAll(tasks, limit = 5) {
   const ret = [];
   let i = 0;
   const workers = new Array(Math.min(limit, tasks.length))
@@ -77,12 +71,9 @@ export default function Projects() {
   const [imagePreview, setImagePreview] = useState(null); // { src, title }
   const [gamePreview, setGamePreview] = useState(null); // { title, videos, shots }
 
-  // caches
-  const [modelCache, setModelCache] = useState(() => new Map()); // GLB -> blobUrl
-  const [imageCache, setImageCache] = useState(() => new Map()); // IMG -> blobUrl
-  const videoMetaWarmed = useRef(new Set()); // Set<videoUrl>
-
-  // track blob URLs to revoke on cleanup
+  // model cache (url -> blobUrl)
+  const [modelCache, setModelCache] = useState(() => new Map());
+  // Keep track of blob URLs to revoke on cleanup
   const blobUrlsRef = useRef(new Set());
 
   // transform filter → API arg
@@ -109,16 +100,12 @@ export default function Projects() {
               ? p.tags
               : [];
 
+          // Accept either video_url or video_urls (and a few aliases)
           const videosRaw = p.video_url ?? p.video_urls ?? p.videos ?? null;
           const shotsRaw = p.screenshots ?? p.images ?? p.shots ?? null;
 
           const videos = toArray(videosRaw).map(toPublicPath);
           const shots = toArray(shotsRaw).map(toPublicPath);
-
-          // 👇 normalize a generic model url; prefer GLB/GLTF, fall back to old field if present
-          const model_url = toPublicPath(
-            p.glb_path || p.model_path || p.fbx_path || ""
-          );
 
           return {
             ...p,
@@ -127,7 +114,7 @@ export default function Projects() {
             screenshots: shots,
             thumbnail: toPublicPath(p.thumbnail),
             project_url: p.project_url ? toPublicPath(p.project_url) : "",
-            model_url, // <— use this everywhere below
+            fbx_path: p.fbx_path ? toPublicPath(p.fbx_path) : "",
           };
         });
 
@@ -141,107 +128,60 @@ export default function Projects() {
     };
   }, [endpointArg]);
 
-  /* ---------- warm glb models + images + video metadata ---------- */
+  /* ---------- preload models once items are available ---------- */
   useEffect(() => {
     if (!items?.length) return;
 
     const controllers = [];
+    const toPreload = items
+      .map((p) => p.fbx_path)
+      .filter(Boolean)
+      .filter((url) => !modelCache.has(url)); // skip already cached
 
-    // Collect URLs to warm
-    const modelUrls = items
-      .map((p) => p.model_url)
-      .filter((u) => u && isLikelyGlb(u))
-      .filter((u) => !modelCache.has(u));
+    if (toPreload.length === 0) return;
 
-    const imageUrls = [];
-    for (const p of items) {
-      if (p.thumbnail && !imageCache.has(p.thumbnail))
-        imageUrls.push(p.thumbnail);
-      if (isLikelyImage(p.project_url) && !imageCache.has(p.project_url)) {
-        imageUrls.push(p.project_url);
-      }
-      for (const s of p.screenshots || []) {
-        if (s && !imageCache.has(s)) imageUrls.push(s);
-      }
-    }
-
-    // Create tasks
-    const modelTasks = modelUrls.map((url) => async () => {
+    const tasks = toPreload.map((url) => async () => {
       const ctrl = new AbortController();
       controllers.push(ctrl);
+
       try {
         const res = await fetch(url, {
           signal: ctrl.signal,
           credentials: "omit",
         });
-        if (!res.ok) throw new Error(`preload model ${url}: ${res.status}`);
-        const blob = await res.blob(); // .glb
+        if (!res.ok) throw new Error(`Failed to preload ${url}: ${res.status}`);
+        const blob = await res.blob();
         const blobUrl = URL.createObjectURL(blob);
+
         blobUrlsRef.current.add(blobUrl);
+        // store in cache
         setModelCache((prev) => {
           const next = new Map(prev);
           next.set(url, blobUrl);
           return next;
         });
-      } catch {}
-    });
-
-    const imageTasks = imageUrls.map((url) => async () => {
-      const ctrl = new AbortController();
-      controllers.push(ctrl);
-      try {
-        const res = await fetch(url, {
-          signal: ctrl.signal,
-          credentials: "omit",
-        });
-        if (!res.ok) throw new Error(`preload image ${url}: ${res.status}`);
-        const blob = await res.blob();
-        const blobUrl = URL.createObjectURL(blob);
-        blobUrlsRef.current.add(blobUrl);
-        setImageCache((prev) => {
-          const next = new Map(prev);
-          next.set(url, blobUrl);
-          return next;
-        });
-      } catch {}
-    });
-
-    // Warm video metadata lightly (no heavy downloads)
-    for (const p of items) {
-      for (const v of p.video_url || []) {
-        if (!videoMetaWarmed.current.has(v)) {
-          videoMetaWarmed.current.add(v);
-          const vid = document.createElement("video");
-          vid.preload = "metadata";
-          vid.src = v;
-          vid.onloadedmetadata = vid.onerror = () => {
-            setTimeout(() => {
-              vid.removeAttribute("src");
-              vid.load();
-            }, 1200);
-          };
-          vid.style.position = "absolute";
-          vid.style.left = "-99999px";
-          vid.style.top = "-99999px";
-          document.body.appendChild(vid);
-          setTimeout(() => vid.remove(), 2500);
-        }
+      } catch (e) {
+        // swallow: we’ll just fall back to the original URL on click
+        // console.warn(e);
       }
-    }
+    });
 
-    // Run warmers with throttling
-    throttleAll([...modelTasks, ...imageTasks], 3);
+    // throttle to avoid network bursts
+    throttleAll(tasks, 3);
 
     return () => {
+      // cancel any in-flight preloads on filter change/unmount
       controllers.forEach((c) => c.abort());
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items]);
 
-  // Cleanup all blob URLs on unmount
+  // Revoke blob URLs when the page unmounts (or on hard reload)
   useEffect(() => {
     return () => {
-      for (const u of blobUrlsRef.current) URL.revokeObjectURL(u);
+      for (const u of blobUrlsRef.current) {
+        URL.revokeObjectURL(u);
+      }
       blobUrlsRef.current.clear();
     };
   }, []);
@@ -275,38 +215,30 @@ export default function Projects() {
             (Array.isArray(p.video_url) && p.video_url.length > 0) ||
             (Array.isArray(p.screenshots) && p.screenshots.length > 0);
 
-          const thumbSrc = imageCache.get(p.thumbnail) || p.thumbnail;
-
           return (
             <article key={p.id} className={styles.card}>
               {p.thumbnail && (
                 <img
-                  src={thumbSrc}
+                  src={p.thumbnail}
                   alt={p.title}
                   className={styles.thumb}
                   onClick={() => {
-                    if (cat === "models" && p.model_url) {
-                      const src = modelCache.get(p.model_url) || p.model_url;
+                    if (cat === "models" && p.fbx_path) {
+                      const src = modelCache.get(p.fbx_path) || p.fbx_path;
                       setModelPreview({ src, title: p.title });
                     } else if (
                       (cat === "assets" || cat === "logos") &&
                       (p.project_url || p.thumbnail)
                     ) {
-                      const srcCandidate = p.project_url || p.thumbnail;
-                      const src =
-                        (isLikelyImage(srcCandidate) &&
-                          imageCache.get(srcCandidate)) ||
-                        imageCache.get(p.thumbnail) ||
-                        srcCandidate;
-                      setImagePreview({ src, title: p.title });
+                      setImagePreview({
+                        src: p.project_url || p.thumbnail,
+                        title: p.title,
+                      });
                     } else if (cat === "games" && hasGameMedia) {
-                      const shots = (p.screenshots || []).map(
-                        (s) => imageCache.get(s) || s
-                      );
                       setGamePreview({
                         title: p.title,
-                        videos: p.video_url, // warmed metadata only
-                        shots,
+                        videos: p.video_url,
+                        shots: p.screenshots,
                       });
                     }
                   }}
@@ -335,12 +267,12 @@ export default function Projects() {
                   style={{ display: "flex", gap: ".5rem", flexWrap: "wrap" }}
                 >
                   {/* Models -> 3D preview */}
-                  {cat === "models" && p.model_url && (
+                  {cat === "models" && p.fbx_path && (
                     <button
                       type="button"
                       className={styles.filterBtn}
                       onClick={() => {
-                        const src = modelCache.get(p.model_url) || p.model_url;
+                        const src = modelCache.get(p.fbx_path) || p.fbx_path;
                         setModelPreview({ src, title: p.title });
                       }}
                     >
@@ -354,15 +286,12 @@ export default function Projects() {
                       <button
                         type="button"
                         className={styles.filterBtn}
-                        onClick={() => {
-                          const srcCandidate = p.project_url || p.thumbnail;
-                          const src =
-                            (isLikelyImage(srcCandidate) &&
-                              imageCache.get(srcCandidate)) ||
-                            imageCache.get(p.thumbnail) ||
-                            srcCandidate;
-                          setImagePreview({ src, title: p.title });
-                        }}
+                        onClick={() =>
+                          setImagePreview({
+                            src: p.project_url || p.thumbnail,
+                            title: p.title,
+                          })
+                        }
                       >
                         Preview
                       </button>
@@ -377,9 +306,7 @@ export default function Projects() {
                         setGamePreview({
                           title: p.title,
                           videos: p.video_url,
-                          shots: (p.screenshots || []).map(
-                            (s) => imageCache.get(s) || s
-                          ),
+                          shots: p.screenshots,
                         })
                       }
                     >
