@@ -44,6 +44,6 @@ jobs:
         with:
           action: upload
           app_location: ./Client
-          output_location: dist
-          skip_app_build: true
+          output_location: dist        # <-- Vite output folder
+          skip_app_build: true         # <-- Do not let Oryx rebuild
           github_id_token: ${{ steps.idtoken.outputs.result }}
