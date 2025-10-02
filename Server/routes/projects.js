@@ -1,3 +1,4 @@
+// Server/routes/projects.js
 const express = require("express");
 const router = express.Router();
 const pool = require("../db");
@@ -9,7 +10,6 @@ router.get("/", async (req, res) => {
     const valid = ["logos", "games", "websites", "assets", "models"];
     const params = [];
 
-    // ⬇️ make sure we SELECT video_url and screenshots
     let sql = `
       SELECT
         id,
@@ -19,9 +19,9 @@ router.get("/", async (req, res) => {
         thumbnail,
         fbx_path,
         project_url,
-        CAST(tags AS CHAR)            AS tags,
-        CAST(video_url  AS CHAR)      AS video_url,     -- JSON string or path
-        CAST(screenshots AS CHAR)     AS screenshots,   -- JSON string or path
+        CAST(tags         AS CHAR) AS tags,
+        CAST(video_url    AS CHAR) AS video_url,
+        CAST(screenshots  AS CHAR) AS screenshots,
         featured,
         created_at
       FROM projects
@@ -40,6 +40,7 @@ router.get("/", async (req, res) => {
   } catch (e) {
     console.error("GET /api/projects error:", e);
     res.status(500).json({
+      ok: false,
       error: "Failed to load projects",
       code: e.code,
       message: e.sqlMessage || e.message,

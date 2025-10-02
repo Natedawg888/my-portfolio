@@ -1,3 +1,4 @@
+// Server/routes/contact.js
 const express = require("express");
 const router = express.Router();
 const nodemailer = require("nodemailer");
@@ -6,7 +7,7 @@ const { GMAIL_USER = "", GMAIL_PASS = "", MAIL_TO = "" } = process.env;
 
 const transporter = nodemailer.createTransport({
   service: "gmail",
-  auth: { user: GMAIL_USER, pass: GMAIL_PASS }, // Use a Gmail App Password
+  auth: { user: GMAIL_USER, pass: GMAIL_PASS }, // Gmail App Password
 });
 
 router.post("/", async (req, res) => {
@@ -18,7 +19,7 @@ router.post("/", async (req, res) => {
       website = "",
     } = req.body || {};
 
-    // Honeypot field to drop bots silently
+    // Honeypot
     if (website) return res.json({ ok: true });
 
     const cleanName = String(name).trim().slice(0, 120);
@@ -30,16 +31,12 @@ router.post("/", async (req, res) => {
       return res.status(400).json({ ok: false, error: "Invalid input." });
     }
 
-    // Send ONE email TO YOU. Replying goes to the sender.
     await transporter.sendMail({
       from: `"Portfolio" <${GMAIL_USER}>`,
-      to: MAIL_TO || GMAIL_USER, // <- your inbox
-      replyTo: `${cleanName} <${cleanEmail}>`, // reply goes to the sender
+      to: MAIL_TO || GMAIL_USER,
+      replyTo: `${cleanName} <${cleanEmail}>`,
       subject: `Portfolio Contact — ${cleanName} <${cleanEmail}>`,
-      text: `From: ${cleanName} <${cleanEmail}>
-
-${cleanMsg}
-`,
+      text: `From: ${cleanName} <${cleanEmail}>\n\n${cleanMsg}\n`,
       html: `
         <div style="font-family:system-ui,Segoe UI,Roboto,Helvetica,Arial">
           <h2 style="margin:0 0 8px">New Portfolio Message</h2>

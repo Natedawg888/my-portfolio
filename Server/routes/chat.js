@@ -1,4 +1,4 @@
-// /Server/routes/chat.js  (CommonJS)
+// Server/routes/chat.js  (CommonJS)
 const fs = require("fs");
 const path = require("path");
 const express = require("express");
@@ -21,12 +21,10 @@ try {
 if (!process.env.OPENAI_API_KEY) {
   console.warn("[chat] OPENAI_API_KEY is not set. /api/ask will 500.");
 }
-
 const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 
-// Helper: prefer Responses API; if it fails with 401/429 or anything, fallback to ChatCompletions
+// Prefer Responses API, fallback to Chat Completions
 async function answerWithFallback({ instructions, input, model }) {
-  // 1) Try Responses API
   try {
     if (openai.responses && typeof openai.responses.create === "function") {
       const r = await openai.responses.create({
@@ -42,18 +40,15 @@ async function answerWithFallback({ instructions, input, model }) {
       );
     } else {
       console.warn(
-        "[chat] responses.create not available in SDK; using chat.completions."
+        "[chat] responses.create not available; using chat.completions."
       );
     }
   } catch (err) {
     const code = err?.status || err?.response?.status;
     const data = err?.response?.data || err?.message || err;
     console.warn("[chat] responses.create failed:", code, data);
-    // fall through
   }
 
-  // 2) Chat Completions fallback (works on more keys)
-  // If you use a 4o model name here, ensure it’s supported by chat.completions.
   const chatModel = model.startsWith("gpt-4o") ? "gpt-4o-mini" : model;
   const r = await openai.chat.completions.create({
     model: chatModel,
@@ -66,10 +61,7 @@ async function answerWithFallback({ instructions, input, model }) {
   return (r.choices?.[0]?.message?.content || "").trim();
 }
 
-/**
- * POST /api/ask
- * body: { message: string, context?: string }
- */
+// POST /api/ask
 router.post("/", async (req, res) => {
   try {
     const message = String(req.body?.message || "").trim();
