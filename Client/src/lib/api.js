@@ -1,32 +1,37 @@
-// Client/src/lib/api.js
+// Centralized API client.
+// Reads VITE_API_BASE (set per environment) and appends paths safely.
+
 const API_BASE = (import.meta.env.VITE_API_BASE || "").replace(/\/$/, "");
 
-function buildUrl(path) {
-  return `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
-}
-
-async function apiGet(path) {
-  const res = await fetch(buildUrl(path), {
+async function http(path, init) {
+  const url = `${API_BASE}${path.startsWith("/") ? "" : "/"}${path}`;
+  const res = await fetch(url, {
     headers: { "Content-Type": "application/json" },
+    ...init,
   });
-  if (!res.ok) {
-    const text = await res.text();
-    throw new Error(`${res.status} ${text}`);
-  }
-  return res.json();
+  const text = await res.text();
+  if (!res.ok) throw new Error(`HTTP ${res.status} — ${text}`);
+  return text ? JSON.parse(text) : null;
 }
 
-export const getProjects = () => apiGet("/api/projects");
+export function getProjects(category) {
+  const qs =
+    category && category !== "all"
+      ? `?category=${encodeURIComponent(category)}`
+      : "";
+  return http(`/api/projects${qs}`);
+}
 
-export const sendContact = (payload) =>
-  fetch(buildUrl("/api/contact"), {
+export function sendContact(payload) {
+  return http("/api/contact", {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(payload),
-  }).then(async (r) => {
-    if (!r.ok) throw new Error(`${r.status} ${await r.text()}`);
-    return r.json();
   });
+}
 
-// Handy for smoke tests from the UI if needed
-export const ping = () => apiGet("/ping");
+export function askChat(message, context = "") {
+  return http("/api/ask", {
+    method: "POST",
+    body: JSON.stringify({ message, context }),
+  });
+}

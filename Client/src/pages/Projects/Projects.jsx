@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { getProjects } from "../../lib/api";
 import styles from "./Projects.module.css";
 
 import ModelViewerModal from "../../components/ModelViewerModal/ModelViewerModal.jsx";
@@ -22,9 +23,6 @@ function safeParseJSON(str) {
     return null;
   }
 }
-
-const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
-
 function toArray(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val.filter(Boolean);
@@ -42,32 +40,31 @@ function toPublicPath(p) {
 }
 
 export default function Projects() {
+  // filters/data
   const [active, setActive] = useState("all");
   const [items, setItems] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
 
-  const [modelPreview, setModelPreview] = useState(null); // {src,title}
-  const [imagePreview, setImagePreview] = useState(null); // {src,title}
-  const [gamePreview, setGamePreview] = useState(null); // {title,videos,shots}
+  // 🔽 modal state (the missing bits)
+  const [modelPreview, setModelPreview] = useState(null); // { src, title }
+  const [imagePreview, setImagePreview] = useState(null); // { src, title }
+  const [gamePreview, setGamePreview] = useState(null); // { title, videos, shots }
 
-  const endpoint = useMemo(() => {
-    const base = `${API_BASE}/api/projects`;
-    return active === "all" ? base : `${base}?category=${active}`;
-  }, [active]);
+  // transform filter → API arg
+  const endpointArg = useMemo(
+    () => (active === "all" ? undefined : active),
+    [active]
+  );
 
+  // fetch
   useEffect(() => {
     let cancel = false;
     setLoading(true);
     setErr("");
 
-    fetch(endpoint)
-      .then(async (r) => {
-        const text = await r.text();
-        if (!r.ok) throw new Error(`HTTP ${r.status} — ${text}`);
-        return JSON.parse(text || "[]");
-      })
-      .then((data) => {
+    getProjects(endpointArg)
+      .then((data = []) => {
         if (cancel) return;
 
         const normalized = data.map((p) => {
@@ -104,7 +101,7 @@ export default function Projects() {
     return () => {
       cancel = true;
     };
-  }, [endpoint]);
+  }, [endpointArg]);
 
   return (
     <section className={styles.section}>
@@ -250,6 +247,7 @@ export default function Projects() {
         })}
       </div>
 
+      {/* Modals */}
       {modelPreview && (
         <ModelViewerModal
           src={modelPreview.src}
@@ -257,7 +255,6 @@ export default function Projects() {
           onClose={() => setModelPreview(null)}
         />
       )}
-
       {imagePreview && (
         <ImageModal
           src={imagePreview.src}
@@ -265,7 +262,6 @@ export default function Projects() {
           onClose={() => setImagePreview(null)}
         />
       )}
-
       {gamePreview && (
         <GameViewerModal
           title={gamePreview.title}

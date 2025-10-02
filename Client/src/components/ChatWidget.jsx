@@ -1,4 +1,5 @@
 import { useEffect, useState, useRef } from "react";
+import { askChat } from "../lib/api";
 
 export default function ChatWidget() {
   const [open, setOpen] = useState(false);
@@ -12,14 +13,12 @@ export default function ChatWidget() {
     open: "/icons/close.png",
   };
 
-  // Close on ESC
   useEffect(() => {
     const onKey = (e) => e.key === "Escape" && setOpen(false);
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, []);
 
-  // Click outside to close
   useEffect(() => {
     const onDoc = (e) => {
       if (!open) return;
@@ -35,16 +34,13 @@ export default function ChatWidget() {
     e.preventDefault();
     const text = input.trim();
     if (!text) return;
+
     setMsgs((m) => [...m, { role: "user", text }]);
     setInput("");
     setBusy(true);
+
     try {
-      const r = await fetch("/api/ask", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ message: text }),
-      });
-      const data = await r.json().catch(() => ({}));
+      const data = await askChat(text);
       setMsgs((m) => [
         ...m,
         { role: "assistant", text: data?.reply || "(no reply)" },
@@ -59,7 +55,6 @@ export default function ChatWidget() {
     }
   };
 
-  // Floating toggle button (always visible)
   const ToggleButton = (
     <button
       onClick={() => setOpen((v) => !v)}
@@ -93,12 +88,11 @@ export default function ChatWidget() {
           pointerEvents: "none",
           filter: "drop-shadow(0 1px 0 rgba(0,0,0,.35))",
         }}
-        onError={(e) => {
-          // graceful fallback if the icon is missing
+        onError={(e) =>
           e.currentTarget.replaceWith(
             document.createTextNode(open ? "×" : "💬")
-          );
-        }}
+          )
+        }
       />
     </button>
   );
@@ -107,12 +101,11 @@ export default function ChatWidget() {
 
   return (
     <>
-      {/* Optional subtle backdrop */}
       <div
         style={{
           position: "fixed",
           inset: 0,
-          background: "transparent", // keep clicks for outside-close without dimming
+          background: "transparent",
           zIndex: 99,
         }}
       />
@@ -122,7 +115,7 @@ export default function ChatWidget() {
         style={{
           position: "fixed",
           right: 16,
-          bottom: 80, // leave space for the toggle
+          bottom: 80,
           width: 340,
           maxHeight: 420,
           background: "rgba(6,36,28,.92)",
@@ -136,7 +129,6 @@ export default function ChatWidget() {
           display: "grid",
           gridTemplateRows: "auto 1fr auto",
           gap: 8,
-          transition: "transform .15s ease, opacity .15s ease",
         }}
       >
         <div
@@ -166,15 +158,7 @@ export default function ChatWidget() {
             </div>
           )}
           {msgs.map((m, i) => (
-            <div
-              key={i}
-              style={{
-                margin: "8px 0",
-                lineHeight: 1.35,
-                display: "grid",
-                gap: 2,
-              }}
-            >
+            <div key={i} style={{ margin: "8px 0", lineHeight: 1.35 }}>
               <div style={{ fontWeight: 700, color: "#edd890" }}>
                 {m.role === "user" ? "You" : "Nathan"}
               </div>

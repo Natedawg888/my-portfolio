@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { sendContact } from "../../lib/api";
 import styles from "./Contact.module.css";
 
 export default function Contact() {
@@ -22,7 +23,6 @@ export default function Contact() {
     setErr("");
     setDone(false);
 
-    // very light client validation
     if (
       !form.name.trim() ||
       !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(form.email) ||
@@ -34,14 +34,8 @@ export default function Contact() {
 
     try {
       setSending(true);
-      const r = await fetch("/api/contact", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(form),
-      });
-      const data = await r.json().catch(() => ({}));
-      if (!r.ok || !data.ok) throw new Error(data.error || `HTTP ${r.status}`);
-
+      const data = await sendContact(form);
+      if (!data?.ok) throw new Error(data?.error || "Failed to send.");
       setDone(true);
       setForm({ name: "", email: "", message: "", website: "" });
     } catch (e2) {
@@ -61,7 +55,6 @@ export default function Contact() {
         </p>
 
         <form className={styles.form} onSubmit={onSubmit} noValidate>
-          {/* honeypot (hidden) */}
           <input
             type="text"
             name="website"
