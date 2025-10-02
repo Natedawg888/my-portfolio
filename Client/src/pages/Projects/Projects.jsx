@@ -22,6 +22,9 @@ function safeParseJSON(str) {
     return null;
   }
 }
+
+const API_BASE = import.meta.env.VITE_API_BASE || window.location.origin;
+
 function toArray(val) {
   if (!val) return [];
   if (Array.isArray(val)) return val.filter(Boolean);
@@ -49,7 +52,7 @@ export default function Projects() {
   const [gamePreview, setGamePreview] = useState(null); // {title,videos,shots}
 
   const endpoint = useMemo(() => {
-    const base = "/api/projects";
+    const base = `${API_BASE}/api/projects`;
     return active === "all" ? base : `${base}?category=${active}`;
   }, [active]);
 
